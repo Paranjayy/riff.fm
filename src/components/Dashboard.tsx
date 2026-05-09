@@ -128,6 +128,39 @@ const Dashboard = () => {
         </section>
       </div>
 
+      {/* Genre Cloud & Top Track Detail */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <section className="lg:col-span-2 glass-card p-8">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            <TrendingUp className="text-primary" size={24} /> Genre Cloud
+          </h2>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {['Indie Pop', 'Synthwave', 'Alternative', 'Dream Pop', 'Lo-Fi', 'Art Rock', 'Shoegaze', 'Neo-Psychedelia'].map((genre, i) => (
+              <motion.span 
+                key={i}
+                whileHover={{ scale: 1.1, color: '#1db954' }}
+                className="px-4 py-2 bg-secondary/50 rounded-full text-sm font-bold border border-white/5 cursor-default transition-colors"
+                style={{ fontSize: `${Math.max(12, 24 - i * 1.5)}px`, opacity: 1 - i * 0.08 }}
+              >
+                {genre}
+              </motion.span>
+            ))}
+          </div>
+        </section>
+
+        <section className="glass-card p-8 flex flex-col items-center justify-center text-center gap-4 border-primary/20">
+          <div className="text-xs font-black uppercase tracking-[0.2em] text-primary">Monthly Highlight</div>
+          <img src={topArtists[0].image} alt="Artist" className="w-32 h-32 rounded-full shadow-2xl shadow-primary/20" />
+          <div>
+            <h3 className="text-xl font-bold">{topArtists[0].name}</h3>
+            <p className="text-muted-foreground text-sm">Your most frequent companion this month.</p>
+          </div>
+          <button className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:scale-[1.02] transition-transform">
+            View Analysis
+          </button>
+        </section>
+      </div>
+
       {/* Habits / Visualization */}
       <section className="glass-card p-8">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
