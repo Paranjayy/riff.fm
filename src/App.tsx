@@ -35,9 +35,13 @@ function App() {
         const artists: Record<string, { count: number, name: string }> = {}
         const tracks: Record<string, { count: number, name: string, artist: string }> = {}
         const timeline: Record<string, number> = {}
+        const hourlyHabits: number[] = new Array(24).fill(0)
+        const weeklyHabits: number[] = new Array(7).fill(0)
         
         allHistory.forEach(item => {
           if (item.master_metadata_album_artist_name) {
+            const date = new Date(item.ts)
+            
             // Artist & Track counts
             const artistName = item.master_metadata_album_artist_name
             artists[artistName] = { 
@@ -54,9 +58,12 @@ function App() {
             }
 
             // Timeline (by Month)
-            const date = new Date(item.ts)
             const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
             timeline[monthKey] = (timeline[monthKey] || 0) + 1
+
+            // Habits
+            hourlyHabits[date.getHours()]++
+            weeklyHabits[date.getDay()]++
           }
         })
 
@@ -64,10 +71,21 @@ function App() {
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([name, plays]) => ({ name, plays }))
 
+        const habitData = hourlyHabits.map((count, hour) => ({ 
+          hour: `${String(hour).padStart(2, '0')}:00`, 
+          count 
+        }))
+
+        const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        const weekData = weeklyHabits.map((count, day) => ({ 
+          day: weekDays[day], 
+          count 
+        }))
+
         const topArtists = Object.values(artists)
           .sort((a, b) => b.count - a.count)
           .slice(0, 10)
-          .map(a => ({ name: a.name, plays: a.count.toLocaleString(), image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop' }))
+          .map(a => ({ name: a.name, plays: a.count.toLocaleString(), image: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(a.name)}` }))
 
         const topTracks = Object.values(tracks)
           .sort((a, b) => b.count - a.count)
@@ -75,9 +93,12 @@ function App() {
           .map(t => ({ name: t.name, artist: t.artist, count: t.count, image: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&h=200&fit=crop' }))
 
         setSpotifyData({
+          allHistory,
           topArtists,
           topTracks,
           historyTimeline,
+          habitData,
+          weekData,
           totalPlays: allHistory.length,
           metadata: { title: "Your Spotify Stats", timestamp: new Date().toISOString() }
         })

@@ -1,9 +1,12 @@
-import { User, Music, Disc, ListMusic, TrendingUp, Clock } from 'lucide-react'
+import { User, Music, Disc, TrendingUp, Clock, Calendar, Star } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { useState, useMemo } from 'react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 
 const demoData = {
   metadata: { title: "Demo User's Stats", timestamp: new Date().toISOString() },
+  totalPlays: 2482,
+  artistsDiscovered: 842,
   topArtists: [
     { name: 'The Weeknd', plays: '1,240', image: 'https://i.scdn.co/image/ab6761610000e5ebcb6926f44f620555ba444fca' },
     { name: 'Taylor Swift', plays: '980', image: 'https://i.scdn.co/image/ab6761610000e5eb5ba2d75eb08a2d672f9b69b7' },
@@ -23,26 +26,93 @@ const demoData = {
     { name: 'Apr', plays: 800 },
     { name: 'May', plays: 500 },
     { name: 'Jun', plays: 900 },
-  ]
+  ],
+  habitData: Array.from({ length: 24 }).map((_, i) => ({ hour: `${String(i).padStart(2, '0')}:00`, count: Math.floor(Math.random() * 100) })),
+  weekData: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => ({ day, count: Math.floor(Math.random() * 200) }))
 }
 
 const Dashboard = ({ externalData }: { externalData?: any }) => {
-  const data = externalData || demoData
-  const userData = data.metadata || demoData.metadata
+  const [selectedYear, setSelectedYear] = useState('All')
+  
+  const processedData = useMemo(() => {
+    if (!externalData?.allHistory) return null
+    
+    const filtered = selectedYear === 'All' 
+      ? externalData.allHistory 
+      : externalData.allHistory.filter((item: any) => new Date(item.ts).getFullYear().toString() === selectedYear)
+
+    const artists: Record<string, { count: number, name: string }> = {}
+    const tracks: Record<string, { count: number, name: string, artist: string }> = {}
+    const timeline: Record<string, number> = {}
+    const hourlyHabits: number[] = new Array(24).fill(0)
+    const weeklyHabits: number[] = new Array(7).fill(0)
+    
+    filtered.forEach((item: any) => {
+      if (item.master_metadata_album_artist_name) {
+        const date = new Date(item.ts)
+        const artistName = item.master_metadata_album_artist_name
+        artists[artistName] = { name: artistName, count: (artists[artistName]?.count || 0) + 1 }
+        
+        const trackName = item.master_metadata_track_name
+        const trackId = `${trackName}-${artistName}`
+        tracks[trackId] = { name: trackName, artist: artistName, count: (tracks[trackId]?.count || 0) + 1 }
+        
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        timeline[monthKey] = (timeline[monthKey] || 0) + 1
+        hourlyHabits[date.getHours()]++
+        weeklyHabits[date.getDay()]++
+      }
+    })
+
+    const historyTimeline = Object.entries(timeline)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, plays]) => ({ name, plays }))
+
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    return {
+      totalPlays: filtered.length,
+      artistsDiscovered: Object.keys(artists).length,
+      topArtists: Object.values(artists).sort((a, b) => b.count - a.count).slice(0, 10).map(a => ({ name: a.name, plays: a.count.toLocaleString(), image: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(a.name)}` })),
+      topTracks: Object.values(tracks).sort((a, b) => b.count - a.count).slice(0, 10).map(t => ({ name: t.name, artist: t.artist, count: t.count, image: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(t.name)}` })),
+      historyTimeline,
+      habitData: hourlyHabits.map((count, hour) => ({ hour: `${String(hour).padStart(2, '0')}:00`, count })),
+      weekData: weeklyHabits.map((count, day) => ({ day: weekDays[day], count }))
+    }
+  }, [externalData, selectedYear])
+
+  const data = processedData || demoData
+  const userData = externalData?.metadata || demoData.metadata
   
   const stats = [
-    { label: 'Total Tracks', value: data.totalPlays?.toLocaleString() || '2,482', icon: Music },
-    { label: 'Top Genre', value: 'Indie Pop', icon: Disc },
-    { label: 'Uniqueness', value: '88%', icon: ListMusic },
+    { label: 'Total Plays', value: data.totalPlays?.toLocaleString() || '0', icon: Music },
+    { label: 'Artists Discovered', value: data.artistsDiscovered?.toLocaleString() || '842', icon: Star },
+    { label: 'Top Genre', value: 'Dream Pop', icon: Disc },
     { label: 'Compatibility', value: '94%', icon: User },
   ]
 
-  const topArtists = data.topArtists || demoData.topArtists
-  const topTracks = data.topTracks || demoData.topTracks
-  const historyTimeline = data.historyTimeline || demoData.historyTimeline
+  const topArtists = data.topArtists
+  const topTracks = data.topTracks
+  const historyTimeline = data.historyTimeline
+  const habitData = data.habitData
+  const weekData = data.weekData
+
+  const years = ['All', '2022', '2023', '2024', '2025']
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Filters */}
+      <div className="flex gap-2 bg-secondary/50 p-1.5 rounded-2xl w-fit border border-white/5">
+        {years.map(year => (
+          <button
+            key={year}
+            onClick={() => setSelectedYear(year)}
+            className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${selectedYear === year ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'hover:bg-white/5 text-muted-foreground hover:text-white'}`}
+          >
+            {year}
+          </button>
+        ))}
+      </div>
+
       {/* Profile Header */}
       <section className="glass-card p-8 flex flex-col md:flex-row items-center gap-6">
         <div className="w-32 h-32 rounded-full border-4 border-primary/20 p-1 relative">
@@ -67,9 +137,12 @@ const Dashboard = ({ externalData }: { externalData?: any }) => {
             ))}
           </div>
         </div>
-        <div className="flex gap-2">
-           <button className="bg-secondary hover:bg-secondary/80 text-white px-6 py-2 rounded-full text-sm font-semibold transition-all">
-            Share Profile
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button className="bg-primary hover:bg-primary/90 text-white px-8 py-2 rounded-full text-sm font-bold transition-all shadow-lg shadow-primary/20">
+            Share Summary
+          </button>
+          <button className="bg-secondary hover:bg-secondary/80 text-white px-8 py-2 rounded-full text-sm font-bold transition-all">
+            Export Data
           </button>
         </div>
       </section>
@@ -212,6 +285,48 @@ const Dashboard = ({ externalData }: { externalData?: any }) => {
           </ResponsiveContainer>
         </div>
       </section>
+      {/* Habit Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <section className="glass-card p-8">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            <Clock className="text-primary" size={24} /> Hourly Habits
+          </h2>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={habitData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: '#ffffff60', fontSize: 10 }} />
+                <YAxis hide />
+                <Tooltip 
+                  cursor={{ fill: '#ffffff05' }}
+                  contentStyle={{ backgroundColor: '#121214', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                />
+                <Bar dataKey="count" fill="#1db954" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        <section className="glass-card p-8">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            <Calendar className="text-primary" size={24} /> Weekly Patterns
+          </h2>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weekData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
+                <XAxis type="number" hide />
+                <YAxis dataKey="day" type="category" axisLine={false} tickLine={false} tick={{ fill: '#ffffff60', fontSize: 12 }} width={40} />
+                <Tooltip 
+                  cursor={{ fill: '#ffffff05' }}
+                  contentStyle={{ backgroundColor: '#121214', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                />
+                <Bar dataKey="count" fill="#1db954" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
