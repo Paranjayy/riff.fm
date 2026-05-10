@@ -1,36 +1,45 @@
 import { User, Music, Disc, ListMusic, TrendingUp, Clock } from 'lucide-react'
-import spotifyData from '../data/spotify_data.json'
 import { motion } from 'framer-motion'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-const Dashboard = () => {
-  // Use data from the DOM snapshot
-  const userData = spotifyData.metadata
-  
-  // Since the DOM snapshot is complex, I'll extract some mock stats 
-  // based on the visual information usually present in such snapshots.
-  // In a real app, this would be parsed from the detailed DOM tree.
-  
-  const stats = [
-    { label: 'Total Tracks', value: '2,482', icon: Music },
-    { label: 'Top Genre', value: 'Indie Pop', icon: Disc },
-    { label: 'Playlists', value: '42', icon: ListMusic },
-    { label: 'Compatibility', value: '94%', icon: User },
-  ]
-
-  // Mock data for top artists/tracks based on common volt.fm profiles
-  const topArtists = [
+const demoData = {
+  metadata: { title: "Demo User's Stats", timestamp: new Date().toISOString() },
+  topArtists: [
     { name: 'The Weeknd', plays: '1,240', image: 'https://i.scdn.co/image/ab6761610000e5ebcb6926f44f620555ba444fca' },
     { name: 'Taylor Swift', plays: '980', image: 'https://i.scdn.co/image/ab6761610000e5eb5ba2d75eb08a2d672f9b69b7' },
     { name: 'Lana Del Rey', plays: '850', image: 'https://i.scdn.co/image/ab6761610000e5eb06f04f40ecb8ca92cb714908' },
     { name: 'Arctic Monkeys', plays: '720', image: 'https://i.scdn.co/image/ab67616d0000b273ab1e3b16de1c7ec009880e97' },
-  ]
-
-  const topTracks = [
+  ],
+  topTracks: [
     { name: 'Blinding Lights', artist: 'The Weeknd', duration: '3:20', image: 'https://i.scdn.co/image/ab67616d0000b2738ecc33f195df6aa257c39eaa' },
     { name: 'Cruel Summer', artist: 'Taylor Swift', duration: '2:58', image: 'https://i.scdn.co/image/ab67616d0000b27351b3e9bb2b71cef8628b2c70' },
     { name: 'Video Games', artist: 'Lana Del Rey', duration: '4:42', image: 'https://i.scdn.co/image/ab67616d0000b27354e544672baa16145d67612b' },
     { name: 'Do I Wanna Know?', artist: 'Arctic Monkeys', duration: '4:32', image: 'https://i.scdn.co/image/ab67616d0000b2733186471e5280d90457a7edd0' },
+  ],
+  historyTimeline: [
+    { name: 'Jan', plays: 400 },
+    { name: 'Feb', plays: 300 },
+    { name: 'Mar', plays: 600 },
+    { name: 'Apr', plays: 800 },
+    { name: 'May', plays: 500 },
+    { name: 'Jun', plays: 900 },
   ]
+}
+
+const Dashboard = ({ externalData }: { externalData?: any }) => {
+  const data = externalData || demoData
+  const userData = data.metadata || demoData.metadata
+  
+  const stats = [
+    { label: 'Total Tracks', value: data.totalPlays?.toLocaleString() || '2,482', icon: Music },
+    { label: 'Top Genre', value: 'Indie Pop', icon: Disc },
+    { label: 'Uniqueness', value: '88%', icon: ListMusic },
+    { label: 'Compatibility', value: '94%', icon: User },
+  ]
+
+  const topArtists = data.topArtists || demoData.topArtists
+  const topTracks = data.topTracks || demoData.topTracks
+  const historyTimeline = data.historyTimeline || demoData.historyTimeline
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -161,28 +170,46 @@ const Dashboard = () => {
         </section>
       </div>
 
-      {/* Habits / Visualization */}
+      {/* History Timeline */}
       <section className="glass-card p-8">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          <Clock className="text-primary" size={24} /> Listening Habits
+          <Clock className="text-primary" size={24} /> History Timeline
         </h2>
-        <div className="h-[200px] w-full flex items-end gap-2 px-2">
-          {Array.from({ length: 24 }).map((_, i) => {
-            const height = Math.random() * 100 + 20
-            return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                <div 
-                  className="w-full bg-primary/20 rounded-t-sm group-hover:bg-primary transition-colors relative"
-                  style={{ height: `${height}%` }}
-                >
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-card border border-border px-2 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {Math.floor(height * 5)} mins
-                  </div>
-                </div>
-                <span className="text-[10px] text-muted-foreground">{i}h</span>
-              </div>
-            )
-          })}
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={historyTimeline}>
+              <defs>
+                <linearGradient id="colorPlays" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#1db954" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#1db954" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+              <XAxis 
+                dataKey="name" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#ffffff60', fontSize: 12 }} 
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#ffffff60', fontSize: 12 }} 
+              />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#121214', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                itemStyle={{ color: '#1db954' }}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="plays" 
+                stroke="#1db954" 
+                fillOpacity={1} 
+                fill="url(#colorPlays)" 
+                strokeWidth={3}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </section>
     </div>

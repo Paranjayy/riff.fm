@@ -1,5 +1,6 @@
+import JSZip from 'jszip'
 import { useState } from 'react'
-import { Music, Users, BarChart2, History } from 'lucide-react'
+import { Music, Users, BarChart2, History, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Dashboard from './components/Dashboard'
 import Compare from './components/Compare'
@@ -9,12 +10,86 @@ function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'compare'>('dashboard')
   const [isImported, setIsImported] = useState(false)
   const [showDemo, setShowDemo] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [spotifyData, setSpotifyData] = useState<any>(null)
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // In a real app, we would use jszip here. For now, we'll simulate the import.
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setIsImported(true)
-      setShowDemo(false)
+      setIsLoading(true)
+      const file = e.target.files[0]
+      
+      try {
+        const zip = new JSZip()
+        const content = await zip.loadAsync(file)
+        const streamingFiles = Object.keys(content.files).filter(name => 
+          name.includes('Streaming_History_Audio') && name.endsWith('.json')
+        )
+
+        let allHistory: any[] = []
+        for (const fileName of streamingFiles) {
+          const fileData = await content.files[fileName].async('text')
+          allHistory = [...allHistory, ...JSON.parse(fileData)]
+        }
+
+        // Process data
+        const artists: Record<string, { count: number, name: string }> = {}
+        const tracks: Record<string, { count: number, name: string, artist: string }> = {}
+        const timeline: Record<string, number> = {}
+        
+        allHistory.forEach(item => {
+          if (item.master_metadata_album_artist_name) {
+            // Artist & Track counts
+            const artistName = item.master_metadata_album_artist_name
+            artists[artistName] = { 
+              name: artistName, 
+              count: (artists[artistName]?.count || 0) + 1 
+            }
+
+            const trackName = item.master_metadata_track_name
+            const trackId = `${trackName}-${artistName}`
+            tracks[trackId] = {
+              name: trackName,
+              artist: artistName,
+              count: (tracks[trackId]?.count || 0) + 1
+            }
+
+            // Timeline (by Month)
+            const date = new Date(item.ts)
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+            timeline[monthKey] = (timeline[monthKey] || 0) + 1
+          }
+        })
+
+        const historyTimeline = Object.entries(timeline)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([name, plays]) => ({ name, plays }))
+
+        const topArtists = Object.values(artists)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10)
+          .map(a => ({ name: a.name, plays: a.count.toLocaleString(), image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop' }))
+
+        const topTracks = Object.values(tracks)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10)
+          .map(t => ({ name: t.name, artist: t.artist, count: t.count, image: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&h=200&fit=crop' }))
+
+        setSpotifyData({
+          topArtists,
+          topTracks,
+          historyTimeline,
+          totalPlays: allHistory.length,
+          metadata: { title: "Your Spotify Stats", timestamp: new Date().toISOString() }
+        })
+        
+        setIsImported(true)
+        setShowDemo(false)
+      } catch (err) {
+        console.error('Error parsing ZIP:', err)
+        alert('Failed to parse ZIP. Make sure it is a valid Spotify data export.')
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -37,9 +112,10 @@ function App() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-          <label className="flex-1 bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold cursor-pointer transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-2">
-            <input type="file" className="hidden" accept=".zip" onChange={handleImport} />
-            Import Data (.zip)
+          <label className={`flex-1 ${isLoading ? 'bg-primary/50' : 'bg-primary hover:bg-primary/90'} text-white px-8 py-4 rounded-2xl font-bold cursor-pointer transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-2`}>
+            <input id="spotify-import-input" type="file" className="hidden" accept=".zip" onChange={handleImport} disabled={isLoading} />
+            {isLoading ? <Loader2 className="animate-spin" size={20} /> : null}
+            {isLoading ? 'Processing...' : 'Import Data (.zip)'}
           </label>
           <button 
             onClick={() => setShowDemo(true)}
@@ -96,7 +172,10 @@ function App() {
           <a href="#" className="p-2 hover:bg-muted rounded-full transition-colors">
             <Music size={20} />
           </a>
-          <button className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold transition-all">
+          <button 
+            onClick={() => document.getElementById('spotify-import-input')?.click()}
+            className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold transition-all"
+          >
             Connect Spotify
           </button>
         </div>
@@ -104,7 +183,7 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 container mx-auto py-8">
-        {activeTab === 'dashboard' ? <Dashboard /> : <Compare />}
+        {activeTab === 'dashboard' ? <Dashboard externalData={spotifyData} /> : <Compare />}
       </main>
 
       {/* Footer */}
